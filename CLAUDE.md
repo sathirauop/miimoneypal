@@ -10,6 +10,8 @@ MiiMoneyPal is a personal finance application for tracking monthly cash flow (In
 
 This is a **Modular Monolithic** architecture organized by Feature, not by technical layer.
 
+**Current Status:** This is a greenfield project. Check [project_status.md](./project_status.md) for current implementation progress.
+
 ## Documentation
 
 This repository maintains several documentation files to track project evolution and architectural decisions:
@@ -25,13 +27,15 @@ Refer to **[project_spec.md](./project_spec.md)** for the complete project speci
 ## Tech Stack
 
 ### Backend
-- **Language:** Java 21 (LTS with Virtual Threads and Records)
+- **Language:** Java 25 (configured in build.gradle toolchain)
 - **Framework:** Spring Boot 4.0.1
-- **Database:** PostgreSQL 16
+- **Database:** PostgreSQL (latest via Docker)
 - **Data Access:** jOOQ (type-safe SQL DSL) - NO native SQL strings
-- **Build Tool:** Gradle
+- **Build Tool:** Gradle with Kotlin DSL
 - **Migrations:** Flyway (write SQL migrations BEFORE jOOQ code generation)
 - **Security:** Spring Security + JWT (stateless)
+- **Testing:** Testcontainers with PostgreSQL, JUnit 5
+- **Dev Tools:** Spring Boot DevTools, Docker Compose integration
 
 ### Frontend
 - **Build Tool:** Vite
@@ -43,27 +47,96 @@ Refer to **[project_spec.md](./project_spec.md)** for the complete project speci
 - **Forms:** React Hook Form + Zod validation
 - **PWA:** vite-plugin-pwa
 
+## Getting Started
+
+### Prerequisites
+- Java 25 JDK (or compatible version)
+- Node.js 18+ and npm
+- Docker and Docker Compose (required for PostgreSQL)
+
+### Initial Setup
+
+**1. Backend Setup**
+```bash
+# Navigate to backend directory
+cd MiiMoneyPal
+
+# Start the application (Docker Compose starts PostgreSQL automatically)
+./gradlew bootRun
+
+# The Spring Boot Docker Compose integration will:
+# - Start PostgreSQL container from compose.yaml
+# - Wait for database to be ready
+# - Configure datasource automatically via @ServiceConnection
+```
+
+**2. Database Credentials (compose.yaml)**
+```yaml
+# Default Docker Compose PostgreSQL settings:
+# Database: mydatabase
+# Username: myuser
+# Password: secret
+# Port: 5432
+```
+
+**3. Running Migrations & jOOQ Generation**
+```bash
+# After writing Flyway migrations in src/main/resources/db/migration/
+./gradlew flywayMigrate
+
+# Generate jOOQ code (after migrations)
+./gradlew generateJooq
+```
+
+**4. Frontend Setup**
+```bash
+# Navigate to frontend directory (once created)
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+```
+
 ## Development Commands
 
-### Backend
+### Backend (run from MiiMoneyPal/ directory)
 ```bash
 # Build the project
 ./gradlew build
 
-# Run application
+# Run application (default port: 8080)
+# Note: Spring Boot Docker Compose integration starts PostgreSQL automatically
 ./gradlew bootRun
 
-# Run tests
+# Run with specific profile
+./gradlew bootRun --args='--spring.profiles.active=dev'
+
+# Run tests (uses Testcontainers - requires Docker)
 ./gradlew test
 
 # Run specific test class
-./gradlew test --tests "com.organization.project.rest.admin.event.post.PostEventUseCaseTest"
+./gradlew test --tests "com.sathira.miimoneypal.rest.transactions.post.PostTransactionUseCaseTest"
 
-# Generate jOOQ code (after Flyway migration)
+# Run tests with coverage
+./gradlew test jacocoTestReport
+
+# Generate jOOQ code (run after any Flyway migration)
 ./gradlew generateJooq
 
 # Run Flyway migrations
 ./gradlew flywayMigrate
+
+# Rollback last migration
+./gradlew flywayUndo
+
+# Clean build
+./gradlew clean build
+
+# Check for dependency updates
+./gradlew dependencyUpdates
 ```
 
 ### Frontend
@@ -71,7 +144,7 @@ Refer to **[project_spec.md](./project_spec.md)** for the complete project speci
 # Install dependencies
 npm install
 
-# Run development server
+# Run development server (default port: 5173)
 npm run dev
 
 # Build for production
@@ -82,6 +155,21 @@ npm run preview
 
 # Run linter
 npm run lint
+
+# Fix linting issues
+npm run lint:fix
+
+# Run type checking (if using TypeScript)
+npm run type-check
+
+# Run tests
+npm run test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Run tests with coverage
+npm run test:coverage
 ```
 
 ## Architecture Principles
@@ -113,23 +201,34 @@ Each REST endpoint gets its own dedicated package at `rest/{feature}/{action}/` 
 
 ### 4. Backend Folder Structure
 ```
-com.organization.project/
-├── architecture/           # Base interfaces (UseCase, AuthenticatedUseCase)
-├── rest/                   # Feature modules (vertical slices)
-│   ├── auth/               # Public auth endpoints
-│   ├── admin/              # Admin-only features
-│   └── {feature}/          # Other public features
-│       └── {action}/       # Endpoint package (post/get/put/delete)
-├── security/               # AppUser, Role, Permission, JWT logic
-├── config/                 # Spring configurations, properties
-├── exception/              # GlobalExceptionHandler, custom exceptions
-├── models/response/        # ApiResponse interface, OffsetSearchResponse
-├── records/{domain}/       # Domain entities (immutable, shared across endpoints)
-├── repository/             # Global repositories (shared by 3+ endpoints)
-├── service/                # Shared services (cross-cutting concerns only)
-├── client/                 # External service clients (S3/R2)
-├── cache/                  # Spring Cache abstractions
-└── constants/              # EndPoints.java (centralized URL paths)
+MiiMoneyPal/                             # Backend root directory
+├── src/main/java/com/sathira/miimoneypal/
+│   ├── MiiMoneyPalApplication.java      # Spring Boot entry point
+│   ├── architecture/                    # Base interfaces (UseCase, AuthenticatedUseCase)
+│   ├── rest/                            # Feature modules (vertical slices)
+│   │   ├── auth/                        # Public auth endpoints
+│   │   ├── admin/                       # Admin-only features
+│   │   └── {feature}/                   # Other public features
+│   │       └── {action}/                # Endpoint package (post/get/put/delete)
+│   ├── security/                        # AppUser, Role, Permission, JWT logic
+│   ├── config/                          # Spring configurations, properties
+│   ├── exception/                       # GlobalExceptionHandler, custom exceptions
+│   ├── models/response/                 # ApiResponse interface, OffsetSearchResponse
+│   ├── records/{domain}/                # Domain entities (immutable, shared across endpoints)
+│   ├── repository/                      # Global repositories (shared by 3+ endpoints)
+│   ├── service/                         # Shared services (cross-cutting concerns only)
+│   ├── client/                          # External service clients (S3/R2)
+│   ├── cache/                           # Spring Cache abstractions
+│   └── constants/                       # EndPoints.java (centralized URL paths)
+├── src/main/resources/
+│   ├── application.properties           # Main configuration
+│   └── db/migration/                    # Flyway SQL migrations (V1__, V2__, etc.)
+├── src/test/java/com/sathira/miimoneypal/
+│   ├── MiiMoneyPalApplicationTests.java # Integration test base
+│   ├── TestMiiMoneyPalApplication.java  # Test runner with Testcontainers
+│   └── TestcontainersConfiguration.java # PostgreSQL container config
+├── compose.yaml                         # Docker Compose for local PostgreSQL
+└── build.gradle                         # Gradle build configuration
 ```
 
 ### 5. Frontend Folder Structure
@@ -257,9 +356,12 @@ src/
 
 ### Backend
 - **Unit Tests:** Test UseCases with mocked dependencies (Repository, Presenter)
-  - Location: `src/test/java/{package}/rest/{feature}/{action}/`
-- **Integration Tests:** Use `@DataJpaTest` or TestContainers for PostgreSQL
+  - Location: `src/test/java/com/sathira/miimoneypal/rest/{feature}/{action}/`
+- **Integration Tests:** Use Testcontainers with PostgreSQL (already configured)
+  - `TestcontainersConfiguration.java` provides PostgreSQL container
+  - `@ServiceConnection` auto-configures datasource
 - **Controller Tests:** Use `@WebMvcTest` with MockMvc
+  - `spring-boot-starter-webmvc-test` dependency included
 
 ### Frontend
 - Test business logic in hooks and utility functions
@@ -293,11 +395,130 @@ When adding a new REST endpoint, create:
 - [ ] Cache (for expensive operations)
 - [ ] Flyway migration
 
+## Implementation Workflow
+
+When starting a new feature, follow this order:
+
+### Backend Feature Implementation
+1. **Database First:** Write Flyway migration in `MiiMoneyPal/src/main/resources/db/migration/`
+2. **Generate Code:** Run `./gradlew generateJooq` to generate type-safe database classes
+3. **Create Domain Record:** Add immutable record in `records/{domain}/`
+4. **Create Endpoint Package:** Create `rest/{feature}/{action}/` directory
+5. **Implement in Order:**
+   - Request/Response records
+   - DataAccess interface
+   - Repository implementation
+   - ResponseBuilder interface
+   - Presenter implementation
+   - UseCase with business logic
+   - Controller method
+6. **Register Endpoint:** Add to `constants/EndPoints.java`
+7. **Configure Security:** Add rules to `SecurityConfig.java`
+8. **Write Tests:** Unit tests for UseCase, integration tests for Repository
+9. **Update Documentation:** Add notes to `Architecture.md` if making architectural decisions
+
+### Frontend Feature Implementation
+1. **Create Feature Module:** Add directory under `src/features/{feature}/`
+2. **API Integration:** Create `api.ts` with Axios calls
+3. **State Management:**
+   - TanStack Query hooks for server state
+   - Redux slice if auth/UI state needed
+4. **Build Components:** Page components and sub-components
+5. **Add Routes:** Register in `App.tsx`
+6. **Update Navigation:** Add to `BottomNav.tsx` if needed
+7. **Write Tests:** Component tests with React Testing Library
+
+### Critical Development Workflow Rules
+- **ALWAYS** write Flyway migration before jOOQ generation
+- **ALWAYS** run `generateJooq` after any migration
+- **ALWAYS** invalidate TanStack Query cache after mutations
+- **NEVER** commit generated jOOQ code (add to `.gitignore`)
+- **NEVER** skip writing tests for UseCases
+
 ## Important Notes
 
 - The backend is designed to be **stateless** and **API-first** to support the future Flutter mobile app (V1)
 - Flyway migrations must be written BEFORE jOOQ code generation
+- **Docker is required** - Spring Boot Docker Compose integration auto-starts PostgreSQL
+- **Testcontainers** handles test database - no manual test DB setup needed
 - Use `@ConditionalOnProperty` for optional beans (R2/S3 repositories)
 - All response DTOs must implement the `ApiResponse` marker interface
 - Caching should use Spring Cache abstraction (`@Cacheable`) for expensive operations
 - CORS must be configured in `WebConfig.java` for frontend origin
+
+## Package Naming Convention
+
+Use this structure for actual implementation:
+- **Backend base package:** `com.sathira.miimoneypal`
+- **Backend directory:** `MiiMoneyPal/`
+- **Frontend features:** Follow the structure in "Frontend Folder Structure" section above
+
+## Environment Configuration
+
+### Backend (application.properties)
+```properties
+# Current minimal config - Spring Boot Docker Compose handles database connection
+spring.application.name=MiiMoneyPal
+
+# Database connection is auto-configured via Docker Compose integration
+# The @ServiceConnection annotation in TestcontainersConfiguration handles this
+
+# Add these for production/explicit configuration:
+# spring.datasource.url=jdbc:postgresql://localhost:5432/mydatabase
+# spring.datasource.username=myuser
+# spring.datasource.password=secret
+```
+
+### Docker Compose (compose.yaml)
+```yaml
+services:
+  postgres:
+    image: 'postgres:latest'
+    environment:
+      - 'POSTGRES_DB=mydatabase'
+      - 'POSTGRES_PASSWORD=secret'
+      - 'POSTGRES_USER=myuser'
+    ports:
+      - '5432:5432'
+```
+
+### JWT Configuration (to be added)
+```yaml
+jwt:
+  secret: your-dev-secret-key-min-256-bits
+  expiration: 86400000  # 24 hours in milliseconds
+```
+
+### Frontend (.env.local)
+```bash
+VITE_API_URL=http://localhost:8080/api
+```
+
+## Testing Infrastructure
+
+The project uses **Testcontainers** for integration testing:
+
+```java
+// TestcontainersConfiguration.java - Pre-configured
+@TestConfiguration(proxyBeanMethods = false)
+class TestcontainersConfiguration {
+    @Bean
+    @ServiceConnection
+    PostgreSQLContainer<?> postgresContainer() {
+        return new PostgreSQLContainer<>(DockerImageName.parse("postgres:latest"));
+    }
+}
+```
+
+**Key Test Classes:**
+- `MiiMoneyPalApplicationTests.java` - Base integration test with `@SpringBootTest`
+- `TestMiiMoneyPalApplication.java` - Run app with Testcontainers from IDE
+- `TestcontainersConfiguration.java` - PostgreSQL container bean definition
+
+**Running Tests:**
+```bash
+# All tests (requires Docker running)
+./gradlew test
+
+# From IDE: Run TestMiiMoneyPalApplication to start app with test database
+```

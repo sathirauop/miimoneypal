@@ -1,0 +1,79 @@
+@import "tailwindcss";
+
+@theme {
+  /* MiiMoneyPal Color Palette */
+  --color-primary: #10b981;
+  --color-primary-dark: #059669;
+  --color-primary-light: #34d399;
+
+  --color-secondary: #6366f1;
+  --color-secondary-dark: #4f46e5;
+
+  /* Semantic Colors */
+  --color-income: #22c55e;
+  --color-expense: #ef4444;
+  --color-investment: #3b82f6;
+  --color-withdrawal: #f59e0b;
+
+  /* Background */
+  --color-background: #f9fafb;
+  --color-surface: #ffffff;
+  --color-surface-elevated: #ffffff;
+
+  /* Text */
+  --color-text-primary: #111827;
+  --color-text-secondary: #6b7280;
+  --color-text-muted: #9ca3af;
+
+  /* Border */
+  --color-border: #e5e7eb;
+  --color-border-light: #f3f4f6;
+
+  /* Danger/Warning */
+  --color-danger: #ef4444;
+  --color-warning: #f59e0b;
+  --color-success: #22c55e;
+}
+
+/* Base styles */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-background text-text-primary antialiased;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  margin: 0;
+}
+
+/* Mobile viewport height fix */
+.h-screen-safe {
+  height: 100dvh;
+}
+
+/* Hide scrollbar but keep functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Transaction type colors */
+.transaction-income {
+  @apply text-income;
+}
+
+.transaction-expense {
+  @apply text-expense;
+}
+
+.transaction-investment {
+  @apply text-investment;
+}
+
+.transaction-withdrawal {
+  @apply text-withdrawal;
+}
