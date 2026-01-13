@@ -38,14 +38,15 @@ Refer to **[project_spec.md](./project_spec.md)** for the complete project speci
 - **Dev Tools:** Spring Boot DevTools, Docker Compose integration
 
 ### Frontend
-- **Build Tool:** Vite
-- **Framework:** React 18
+- **Build Tool:** Vite 7
+- **Framework:** React 19
 - **Language:** JavaScript (ES6+)
 - **State Management:** TanStack Query v5 (server state) + Redux Toolkit (auth/UI state)
-- **Styling:** Tailwind CSS + Shadcn/UI (Radix Primitives)
-- **Routing:** React Router DOM v6
+- **Styling:** Tailwind CSS v4 + Shadcn/UI (Radix Primitives)
+- **Routing:** React Router DOM v7
 - **Forms:** React Hook Form + Zod validation
 - **PWA:** vite-plugin-pwa
+- **Testing:** Vitest + React Testing Library
 
 ## Getting Started
 
@@ -90,8 +91,8 @@ cd MiiMoneyPal
 
 **4. Frontend Setup**
 ```bash
-# Navigate to frontend directory (once created)
-cd frontend
+# Navigate to frontend directory
+cd mimoneypal-ui
 
 # Install dependencies
 npm install
@@ -139,7 +140,7 @@ npm run dev
 ./gradlew dependencyUpdates
 ```
 
-### Frontend
+### Frontend (run from mimoneypal-ui/ directory)
 ```bash
 # Install dependencies
 npm install
@@ -158,9 +159,6 @@ npm run lint
 
 # Fix linting issues
 npm run lint:fix
-
-# Run type checking (if using TypeScript)
-npm run type-check
 
 # Run tests
 npm run test
@@ -233,23 +231,24 @@ MiiMoneyPal/                             # Backend root directory
 
 ### 5. Frontend Folder Structure
 ```
-src/
+mimoneypal-ui/src/
 ├── features/               # Business logic modules
-│   ├── auth/               # Auth API, authSlice, Login.tsx, useAuth.ts
-│   ├── dashboard/          # Dashboard page + components
-│   ├── transactions/       # CRUD + TransactionList/History
-│   ├── buckets/            # Bucket management
-│   ├── categories/         # Category management
-│   └── settings/           # User settings
+│   ├── auth/               # authSlice.js, useAuth.js, Login.jsx
+│   ├── dashboard/          # Dashboard.jsx + components
+│   ├── transactions/       # Transactions.jsx + CRUD components
+│   ├── buckets/            # Buckets.jsx + management components
+│   ├── categories/         # Category management (used in forms)
+│   └── settings/           # Settings.jsx + user preferences
 ├── components/
 │   ├── ui/                 # Shadcn components (Button, Input, Card)
-│   └── Layout/             # Layout, BottomNav, ProtectedRoute
+│   └── Layout/             # Layout.jsx, BottomNav.jsx, ProtectedRoute.jsx
 ├── lib/
-│   ├── axios.ts            # Axios instance + JWT interceptors
-│   ├── queryClient.ts      # TanStack Query config
-│   └── utils.ts            # Utility functions (cn, formatCurrency)
-├── store/                  # Redux store config + typed hooks
-└── App.tsx                 # Route definitions
+│   ├── axios.js            # Axios instance + JWT interceptors
+│   ├── queryClient.js      # TanStack Query config + query keys
+│   └── utils.js            # Utility functions (cn, formatCurrency, formatDate)
+├── store/                  # Redux store (index.js, hooks.js, uiSlice.js)
+├── test/                   # Test setup and utilities
+└── App.jsx                 # Route definitions + providers
 ```
 
 ## Critical Implementation Rules
@@ -312,7 +311,7 @@ src/
    - Protected routes: `/`, `/transactions`, `/buckets`, `/settings`
 
 4. **API Integration**
-   - Axios instance with JWT interceptor in `lib/axios.ts`
+   - Axios instance with JWT interceptor in `lib/axios.js`
    - Proxy `/api` to `http://localhost:8080` in Vite config
    - Invalidate TanStack Query cache after mutations
 
@@ -419,14 +418,14 @@ When starting a new feature, follow this order:
 
 ### Frontend Feature Implementation
 1. **Create Feature Module:** Add directory under `src/features/{feature}/`
-2. **API Integration:** Create `api.ts` with Axios calls
+2. **API Integration:** Create `api.js` with Axios calls
 3. **State Management:**
    - TanStack Query hooks for server state
    - Redux slice if auth/UI state needed
 4. **Build Components:** Page components and sub-components
-5. **Add Routes:** Register in `App.tsx`
-6. **Update Navigation:** Add to `BottomNav.tsx` if needed
-7. **Write Tests:** Component tests with React Testing Library
+5. **Add Routes:** Register in `App.jsx`
+6. **Update Navigation:** Add to `BottomNav.jsx` if needed
+7. **Write Tests:** Component tests with React Testing Library + Vitest
 
 ### Critical Development Workflow Rules
 - **ALWAYS** write Flyway migration before jOOQ generation
@@ -451,6 +450,7 @@ When starting a new feature, follow this order:
 Use this structure for actual implementation:
 - **Backend base package:** `com.sathira.miimoneypal`
 - **Backend directory:** `MiiMoneyPal/`
+- **Frontend directory:** `mimoneypal-ui/`
 - **Frontend features:** Follow the structure in "Frontend Folder Structure" section above
 
 ## Environment Configuration
