@@ -2,6 +2,7 @@ plugins {
     id 'java'
     id 'org.springframework.boot' version '4.0.1'
     id 'io.spring.dependency-management' version '1.1.7'
+    id 'nu.studer.jooq' version '9.0'
 }
 
 group = 'com.sathira'
@@ -30,11 +31,24 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
     implementation 'org.flywaydb:flyway-database-postgresql'
+
+    // JWT dependencies for stateless authentication
+    implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
+
+    // Bean validation
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+
     compileOnly 'org.projectlombok:lombok'
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
     developmentOnly 'org.springframework.boot:spring-boot-docker-compose'
     runtimeOnly 'org.postgresql:postgresql'
     annotationProcessor 'org.projectlombok:lombok'
+
+    // jOOQ code generation dependencies
+    jooqGenerator 'org.postgresql:postgresql'
+
     testImplementation 'org.springframework.boot:spring-boot-starter-flyway-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-jooq-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
@@ -43,6 +57,137 @@ dependencies {
     testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
     testImplementation 'org.testcontainers:testcontainers-postgresql'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+// Database connection properties (matches compose.yaml)
+ext {
+    dbUrl = 'jdbc:postgresql://localhost:5433/mydatabase'
+    dbUser = 'myuser'
+    dbPassword = 'secret'
+    dbName = 'mydatabase'
+    containerName = 'miimoneypal-postgres-1'
+}
+
+// Custom task to run SQL migrations directly via Docker psql
+tasks.register('dbMigrate', Exec) {
+    group = 'database'
+    description = 'Applies SQL migrations using psql via Docker'
+
+    def migrationDir = file('src/main/resources/db/migration')
+    inputs.files(fileTree(migrationDir))
+
+    // Sort migration files in version order (V1__, V2__, etc.)
+    def migrationFiles = fileTree(migrationDir).files.sort { it.name }
+
+    // Build the psql command to run all migrations in order
+    def sqlScript = migrationFiles.collect { f ->
+        "\\i /migrations/${f.name}"
+    }.join('\n')
+
+    commandLine 'docker', 'exec', '-i', containerName,
+            'psql', '-U', dbUser, '-d', dbName, '-c', sqlScript
+
+    // Handle existing objects gracefully (migrations might have already run)
+    ignoreExitValue = true
+
+    doFirst {
+        println "Running ${migrationFiles.size()} migration file(s)..."
+    }
+}
+
+// Run migrations by executing SQL files via Docker psql
+tasks.register('flywayMigrate', Exec) {
+    group = 'flyway'
+    description = 'Applies Flyway migrations via Docker psql'
+
+    def migrationDir = file('src/main/resources/db/migration')
+    inputs.files(fileTree(migrationDir))
+
+    // Concatenate all migration files in order
+    doFirst {
+        def migrationFiles = fileTree(migrationDir).files.sort { it.name }
+        def combinedSql = migrationFiles.collect { it.text }.join('\n')
+
+        // Write to temp file for piping to psql
+        def tempFile = file("${buildDir}/migrations-combined.sql")
+        tempFile.parentFile.mkdirs()
+        tempFile.text = combinedSql
+
+        println "Applying ${migrationFiles.size()} migration file(s)..."
+
+        standardInput = tempFile.newInputStream()
+    }
+
+    commandLine 'docker', 'exec', '-i', containerName,
+            'psql', '-U', dbUser, '-d', dbName
+
+    // Migrations may fail if tables already exist - that's OK
+    ignoreExitValue = true
+
+    doLast {
+        println "Migration process completed"
+    }
+}
+
+// jOOQ code generation configuration
+jooq {
+    version = dependencyManagement.importedProperties['jooq.version']
+
+    configurations {
+        main {
+            generationTool {
+                jdbc {
+                    driver = 'org.postgresql.Driver'
+                    url = dbUrl
+                    user = dbUser
+                    password = dbPassword
+                }
+
+                generator {
+                    name = 'org.jooq.codegen.DefaultGenerator'
+
+                    database {
+                        name = 'org.jooq.meta.postgres.PostgresDatabase'
+                        inputSchema = 'public'
+                        includes = '.*'
+                        excludes = 'flyway_schema_history'
+                    }
+
+                    target {
+                        packageName = 'com.sathira.miimoneypal.jooq'
+                        directory = 'build/generated-src/jooq/main'
+                    }
+
+                    generate {
+                        deprecated = false
+                        records = true
+                        pojos = false
+                        immutablePojos = false
+                        interfaces = false
+                        daos = false
+                        jpaAnnotations = false
+                        validationAnnotations = false
+                        springAnnotations = false
+                        javaTimeTypes = true
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Task dependencies: Run migrations before jOOQ code generation
+tasks.named('generateJooq') {
+    dependsOn 'flywayMigrate'
+
+    doFirst {
+        println 'Generating jOOQ code from PostgreSQL schema...'
+    }
+}
+
+// Ensure jOOQ code is generated before compilation
+tasks.named('compileJava') {
+    dependsOn 'generateJooq'
 }
 
 tasks.named('test') {

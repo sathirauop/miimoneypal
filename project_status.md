@@ -1,24 +1,59 @@
 # Project Status
 
-**Last Updated**: 2026-01-14
+**Last Updated**: 2026-01-17
 **Analyzed By**: Project Status Analyzer Agent
 
-## Current Phase: Frontend Scaffolding Complete
+## Current Phase: Security Infrastructure Complete
 
-Both backend and frontend scaffolding are now complete. The project is ready for feature development.
+Backend security infrastructure with JWT authentication is now complete. The project is ready for implementing the Auth feature module (login/register endpoints).
 
 ## Completed
 
 ### Backend Infrastructure
 - [x] Spring Boot 4.0.1 project initialized
 - [x] Gradle build configuration with all dependencies
-- [x] Docker Compose setup for PostgreSQL
+- [x] Docker Compose setup for PostgreSQL (port 5433)
 - [x] Spring Boot Docker Compose integration (auto-starts DB)
 - [x] Testcontainers configured for integration testing
 - [x] Flyway migration framework installed
 - [x] jOOQ dependency installed
+- [x] **jOOQ Gradle plugin configured (nu.studer.jooq v9.0)**
+- [x] **jOOQ code generation working** (generates to `build/generated-src/jooq/main/`)
+- [x] **Custom Flyway migration task** (Docker psql-based, Gradle 9.2.1 compatible)
+- [x] **Task chain configured:** `compileJava` → `generateJooq` → `flywayMigrate`
 - [x] Spring Security dependency installed
 - [x] Lombok configured
+- [x] Bean validation dependency (spring-boot-starter-validation)
+
+### Backend Security Infrastructure (NEW)
+- [x] **JWT dependencies** (jjwt-api 0.12.6, jjwt-impl, jjwt-jackson)
+- [x] **SecurityConfig.java** - Stateless JWT filter chain, CORS configuration
+- [x] **JwtTokenProvider** - Access/refresh token generation and validation
+- [x] **JwtAuthenticationFilter** - Token extraction from Authorization header
+- [x] **JwtAuthenticationEntryPoint** - 401 Unauthorized handler
+- [x] **JwtAccessDeniedHandler** - 403 Forbidden handler
+- [x] **AppUser** - Spring Security UserDetails implementation
+- [x] **Role enum** - USER role with permissions
+- [x] **Permission enum** - Fine-grained permissions (transaction:read, etc.)
+- [x] **application.properties** - JWT config, Jackson snake_case, logging
+
+### Backend Core Architecture (NEW)
+- [x] **UseCase interface** - Base interface for business logic orchestrators
+- [x] **AuthenticatedUseCase interface** - Use cases requiring user context
+- [x] **ApiResponse interface** - Marker interface for response DTOs
+- [x] **ErrorResponse record** - Standard error format with field errors
+- [x] **OffsetSearchResponse** - Generic paginated response
+- [x] **EndPoints.java** - Centralized API route constants
+- [x] **GlobalExceptionHandler** - Consistent exception-to-response mapping
+- [x] **Custom exceptions** - ResourceNotFoundException, BadRequestException, BusinessRuleException, DuplicateResourceException
+- [x] **Exception handlers** - Handles validation errors, security exceptions (BadCredentials, AccessDenied), and catch-all for unexpected errors
+
+### Backend Domain Records (NEW)
+- [x] **Enum types** - TransactionType, CategoryType, BucketType, BucketStatus
+- [x] **User record** - Immutable domain record with validation and helper methods
+- [x] **Category record** - Category domain record with type matching and archival logic
+- [x] **Bucket record** - Bucket domain record with target validation and status checks
+- [x] **Transaction record** - Transaction domain record with balance effect calculations
 
 ### Test Infrastructure (Backend)
 - [x] JUnit 5 with Jupiter
@@ -146,26 +181,12 @@ Nothing currently in progress.
 
 ## Not Started
 
-### Backend - Core Infrastructure
+### Backend - Remaining Infrastructure
 
-**CRITICAL FINDING**: Only `MiiMoneyPalApplication.java` exists in the entire backend codebase. NO business logic has been implemented.
-
-**What EXISTS:**
-- [ ] Flyway migrations written (V1__create_tables.sql, V2__create_views.sql)
-- [ ] Database schema fully designed with constraints and indexes
-
-**What DOES NOT EXIST:**
-- [ ] jOOQ code generation plugin configuration (BLOCKS ALL DATA ACCESS)
-- [ ] Spring Security configuration (SecurityConfig.java - app is completely unsecured)
-- [ ] Global exception handler (exception/ package does not exist)
-- [ ] API response wrapper (`ApiResponse` interface - models/response/ does not exist)
-- [ ] Base architecture interfaces (`UseCase`, `AuthenticatedUseCase` - architecture/ does not exist)
-- [ ] `EndPoints.java` constants file (constants/ package does not exist)
-- [ ] Jackson snake_case configuration
-- [ ] Domain records (records/ package does not exist - no User, Transaction, Category, Bucket records)
-- [ ] Any repository layer code (repository/ package does not exist)
-- [ ] Any configuration classes (config/ package does not exist)
-- [ ] Security package (security/ package does not exist - no JWT, no AppUser, no Role)
+**What STILL NEEDS TO BE CREATED:**
+- [x] ~~Domain records (records/ package - User, Transaction, Category, Bucket records)~~ ✅ COMPLETED
+- [ ] Repository layer code (repository/ package - shared repositories)
+- [ ] UserDetailsService implementation for loading users from database
 
 ### Backend - Feature Modules
 
@@ -304,71 +325,71 @@ The frontend scaffolding is **100% complete** for infrastructure setup:
 
 ## Known Issues
 
-### CRITICAL Blockers
-1. **jOOQ generation not configured** - The `nu.studer.jooq` Gradle plugin is NOT in build.gradle. Without this, `./gradlew generateJooq` command does not exist and NO type-safe database access code can be generated. This blocks ALL backend data access implementation.
-2. **Flyway tasks not exposed** - The Flyway Gradle plugin is not explicitly configured, so `./gradlew flywayMigrate` and related commands are not available.
-3. **Zero backend business logic** - The entire backend consists of ONLY MiiMoneyPalApplication.java. No packages exist for rest/, records/, repository/, security/, config/, exception/, constants/, models/, service/, client/, or cache/.
+### RESOLVED (Previously Critical)
+1. ~~**jOOQ generation not configured**~~ - RESOLVED: nu.studer.jooq v9.0 plugin configured and working
+2. ~~**Flyway tasks not exposed**~~ - RESOLVED: Custom flywayMigrate task using Docker psql
+3. ~~**No Spring Security configuration**~~ - RESOLVED: Full JWT security infrastructure implemented
 
 ### HIGH Priority Issues
-4. **No Spring Security configuration** - Application is completely unsecured. No JWT implementation, no SecurityConfig.java, no authentication filters.
-5. **No Shadcn components** - The `components/ui/` directory is empty. No UI components installed despite being required for all forms and UI.
-6. **Frontend has 0% real functionality** - All feature pages are empty placeholder components with no API integration, no forms, no data display.
+1. **No REST endpoints** - The `rest/` package does not exist. Auth feature module (login/register) is the next critical step.
+2. **No Shadcn components** - The `components/ui/` directory is empty. No UI components installed despite being required for all forms and UI.
+3. **Frontend has 0% real functionality** - All feature pages are empty placeholder components with no API integration, no forms, no data display.
 
 ### MEDIUM Priority Issues
-7. **No actual tests** - Test infrastructure exists but no test files written (no *.test.js, *.test.java files for business logic)
-8. **Categories feature empty** - The `src/features/categories/` directory exists but contains no files
-9. **No Gradle task verification** - Cannot confirm if Flyway migrations have been run or if database schema exists in actual PostgreSQL instance
+4. **No actual tests** - Test infrastructure exists but no test files written (no *.test.js, *.test.java files for business logic)
+5. **Categories feature empty** - The `src/features/categories/` directory exists but contains no files
+6. **No UserDetailsService** - JWT filter builds AppUser from token, but login endpoint will need to load user from database
 
 ## Next Steps (Critical Path)
 
-### Phase 1: Unblock Backend Development (CRITICAL)
-1. **Add jOOQ Gradle plugin to build.gradle** - Add `nu.studer.jooq` plugin with database connection config
-2. **Add Flyway Gradle plugin configuration** - Expose flywayMigrate, flywayClean, flywayInfo tasks
-3. **Run Flyway migrations** - Execute `./gradlew flywayMigrate` to create database schema
-4. **Run jOOQ generation** - Execute `./gradlew generateJooq` to create type-safe DB classes
-5. **Verify generated code** - Check that generated jOOQ classes exist in build/generated-src/jooq/
+### ~~Phase 1: Unblock Backend Development~~ ✅ COMPLETED
+- jOOQ Gradle plugin configured and working
+- Custom Flyway migration task implemented
+- Database schema created and jOOQ code generated
 
-### Phase 2: Build Core Architecture (CRITICAL)
-6. **Create architecture package** - Add UseCase and AuthenticatedUseCase interfaces
-7. **Create models/response package** - Add ApiResponse interface, OffsetSearchResponse
-8. **Create exception package** - Add GlobalExceptionHandler, custom exception classes
-9. **Create constants package** - Add EndPoints.java with API route constants
-10. **Create records package** - Add User, Transaction, Category, Bucket domain records
-11. **Configure Jackson** - Add PropertyNamingStrategies.SNAKE_CASE in WebConfig or application.properties
+### ~~Phase 2: Build Core Architecture~~ ✅ COMPLETED
+- UseCase and AuthenticatedUseCase interfaces created
+- ApiResponse, ErrorResponse, OffsetSearchResponse implemented
+- GlobalExceptionHandler with custom exceptions
+- EndPoints constants file created
+- Jackson snake_case configured in application.properties
 
-### Phase 3: Implement Security (CRITICAL)
-12. **Create security package** - Add AppUser, Role, Permission enums
-13. **Create JWT infrastructure** - JwtTokenProvider, JwtAuthenticationFilter, JwtAuthenticationEntryPoint
-14. **Create SecurityConfig.java** - Configure HTTP security, password encoder, JWT filters
-15. **Create UserRepository** - First repository using jOOQ for user authentication
+### ~~Phase 3: Implement Security~~ ✅ COMPLETED
+- AppUser, Role, Permission enums created
+- JwtTokenProvider, JwtAuthenticationFilter implemented
+- SecurityConfig with stateless session management
+- CORS configured for frontend origins
 
-### Phase 4: First Feature - Auth (HIGH)
-16. **Build auth module** - rest/auth/login/, rest/auth/register/ with full vertical slice
-17. **Test auth endpoints** - Use Postman/curl to verify login/register work
-18. **Update SecurityConfig** - Add auth endpoints to public access list
+### Phase 4: First Feature - Auth (CURRENT PRIORITY)
+1. ~~**Create User domain record**~~ ✅ COMPLETED - `records/user/User.java`
+2. **Build UserRepository** - jOOQ-based repository for user lookup by email
+3. **Build login endpoint** - rest/auth/login/ with full vertical slice pattern
+4. **Build register endpoint** - rest/auth/register/ with password hashing
+5. **Build refresh endpoint** - rest/auth/refresh/ for token renewal
+6. **Test auth endpoints** - Verify with curl/Postman
 
 ### Phase 5: Frontend Connection (HIGH)
-19. **Install Shadcn components** - At minimum: Button, Input, Card, Dialog, Label, Form
-20. **Build Login form** - Connect to backend /auth/login endpoint with validation
-21. **Test full auth flow** - Register → Login → JWT stored → Protected routes accessible
+7. **Install Shadcn components** - Button, Input, Card, Dialog, Label, Form
+8. **Build Login form** - Connect to backend /api/auth/login with validation
+9. **Test full auth flow** - Register → Login → JWT stored → Protected routes accessible
 
 ### Phase 6: First Full Vertical Slice (MEDIUM)
-22. **Build Categories CRUD backend** - rest/categories/ with all endpoints (POST, GET, PUT, DELETE, PATCH archive)
-23. **Build Categories CRUD frontend** - Category list, add/edit forms, archive functionality
-24. **Test end-to-end** - Verify full CRUD cycle works from UI → API → Database
+10. **Build Categories CRUD backend** - rest/categories/ with all endpoints
+11. **Build Categories CRUD frontend** - Category list, add/edit forms
+12. **Test end-to-end** - Verify full CRUD cycle
 
 ### Phase 7: Remaining Features (LOWER)
-25. Transactions module (most complex - needs categories and buckets)
-26. Buckets module with investment/withdrawal logic
-27. Dashboard with monthly calculations
-28. Settings page
-29. Test coverage
-30. PWA offline support and polish
+13. Transactions module (most complex - needs categories and buckets)
+14. Buckets module with investment/withdrawal logic
+15. Dashboard with monthly calculations
+16. Settings page
+17. Test coverage
+18. PWA offline support and polish
 
 ## Estimated Effort Remaining
 
-- **Backend core architecture**: 8-12 hours
-- **Spring Security + JWT**: 6-8 hours
+- ~~**Backend core architecture**: 8-12 hours~~ ✅ COMPLETED
+- ~~**Spring Security + JWT**: 6-8 hours~~ ✅ COMPLETED
 - **Auth feature (first vertical slice)**: 4-6 hours
 - **Categories CRUD**: 6-8 hours
 - **Transactions CRUD**: 12-16 hours
@@ -377,13 +398,13 @@ The frontend scaffolding is **100% complete** for infrastructure setup:
 - **Frontend feature integration**: 20-30 hours
 - **Testing + polish**: 15-20 hours
 
-**TOTAL ESTIMATED**: 90-130 hours remaining for MVP
+**TOTAL ESTIMATED**: 75-110 hours remaining for MVP (down from 90-130)
 
 ## Project Health Assessment
 
 - **Infrastructure**: GREEN (scaffolding complete, dependencies installed)
-- **Backend Implementation**: RED (0% - only main class exists)
+- **Backend Security**: GREEN (JWT authentication, CORS, exception handling complete)
+- **Backend Features**: RED (0% - no REST endpoints yet)
 - **Frontend Implementation**: YELLOW (structure exists, 0% functionality)
-- **Database**: GREEN (schema designed, migrations written, ready to run)
-- **Security**: RED (0% - completely unsecured)
-- **Overall Status**: RED - Project has solid foundation but needs full implementation
+- **Database**: GREEN (schema designed, migrations applied, jOOQ generated)
+- **Overall Status**: YELLOW - Security foundation complete, ready for feature development

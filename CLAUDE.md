@@ -31,7 +31,7 @@ Refer to **[project_spec.md](./project_spec.md)** for the complete project speci
 - **Framework:** Spring Boot 4.0.1
 - **Database:** PostgreSQL (latest via Docker)
 - **Data Access:** jOOQ (type-safe SQL DSL) - NO native SQL strings
-- **Build Tool:** Gradle with Kotlin DSL
+- **Build Tool:** Gradle with Groovy DSL
 - **Migrations:** Flyway (write SQL migrations BEFORE jOOQ code generation)
 - **Security:** Spring Security + JWT (stateless)
 - **Testing:** Testcontainers with PostgreSQL, JUnit 5
@@ -77,17 +77,24 @@ cd MiiMoneyPal
 # Database: mydatabase
 # Username: myuser
 # Password: secret
-# Port: 5432
+# Port: 5433 (mapped from container's 5432 to avoid local PostgreSQL conflicts)
 ```
+
+**Important:** The Gradle tasks use a hardcoded container name: `miimoneypal-postgres-1`
+- This is the default Docker Compose naming pattern: `{project}-{service}-{index}`
+- If your project folder has a different name, tasks will fail
+- To verify container name: `docker ps --format "{{.Names}}" | grep postgres`
 
 **3. Running Migrations & jOOQ Generation**
 ```bash
-# After writing Flyway migrations in src/main/resources/db/migration/
-./gradlew flywayMigrate
-
-# Generate jOOQ code (after migrations)
+# Generate jOOQ code (automatically runs migrations first via task chain)
 ./gradlew generateJooq
+
+# Task chain: compileJava → generateJooq → flywayMigrate
+# You don't need to manually run flywayMigrate before generateJooq
 ```
+
+**Note:** The `flywayMigrate` task is a custom Docker-based task (not the standard Flyway Gradle plugin) due to Gradle 9.2.1 compatibility. It uses `docker exec` with psql to apply migrations.
 
 **4. Frontend Setup**
 ```bash
@@ -124,20 +131,16 @@ npm run dev
 # Run tests with coverage
 ./gradlew test jacocoTestReport
 
-# Generate jOOQ code (run after any Flyway migration)
+# Generate jOOQ code (automatically runs flywayMigrate first)
+# Requires: PostgreSQL container running on port 5433
 ./gradlew generateJooq
 
-# Run Flyway migrations
+# Run Flyway migrations manually (custom Docker psql task)
+# Note: This is called automatically by generateJooq
 ./gradlew flywayMigrate
 
-# Rollback last migration
-./gradlew flywayUndo
-
-# Clean build
+# Clean build (removes generated jOOQ code - will regenerate on next build)
 ./gradlew clean build
-
-# Check for dependency updates
-./gradlew dependencyUpdates
 ```
 
 ### Frontend (run from mimoneypal-ui/ directory)
@@ -202,32 +205,43 @@ Each REST endpoint gets its own dedicated package at `rest/{feature}/{action}/` 
 MiiMoneyPal/                             # Backend root directory
 ├── src/main/java/com/sathira/miimoneypal/
 │   ├── MiiMoneyPalApplication.java      # Spring Boot entry point
-│   ├── architecture/                    # Base interfaces (UseCase, AuthenticatedUseCase)
-│   ├── rest/                            # Feature modules (vertical slices)
-│   │   ├── auth/                        # Public auth endpoints
+│   ├── architecture/                    # Base interfaces (UseCase, AuthenticatedUseCase) ✅
+│   ├── config/                          # Spring configurations ✅
+│   │   └── SecurityConfig.java          # JWT filter chain, CORS, BCrypt encoder
+│   ├── constants/                       # EndPoints.java (centralized URL paths) ✅
+│   ├── exception/                       # GlobalExceptionHandler, custom exceptions ✅
+│   ├── models/response/                 # ApiResponse, ErrorResponse, OffsetSearchResponse ✅
+│   ├── rest/                            # Feature modules (vertical slices) - NOT YET CREATED
+│   │   ├── auth/                        # Public auth endpoints (login, register, refresh)
 │   │   ├── admin/                       # Admin-only features
 │   │   └── {feature}/                   # Other public features
 │   │       └── {action}/                # Endpoint package (post/get/put/delete)
-│   ├── security/                        # AppUser, Role, Permission, JWT logic
-│   ├── config/                          # Spring configurations, properties
-│   ├── exception/                       # GlobalExceptionHandler, custom exceptions
-│   ├── models/response/                 # ApiResponse interface, OffsetSearchResponse
-│   ├── records/{domain}/                # Domain entities (immutable, shared across endpoints)
-│   ├── repository/                      # Global repositories (shared by 3+ endpoints)
-│   ├── service/                         # Shared services (cross-cutting concerns only)
-│   ├── client/                          # External service clients (S3/R2)
-│   ├── cache/                           # Spring Cache abstractions
-│   └── constants/                       # EndPoints.java (centralized URL paths)
+│   ├── security/                        # Security infrastructure ✅
+│   │   ├── AppUser.java                 # Spring Security UserDetails implementation
+│   │   ├── Role.java                    # USER role with permissions
+│   │   ├── Permission.java              # Fine-grained permissions enum
+│   │   ├── JwtAuthenticationEntryPoint.java  # 401 handler
+│   │   ├── JwtAccessDeniedHandler.java       # 403 handler
+│   │   └── jwt/                         # JWT token handling
+│   │       ├── JwtTokenProvider.java    # Token generation/validation
+│   │       └── JwtAuthenticationFilter.java  # Extract JWT from requests
+│   ├── records/{domain}/                # Domain entities - NOT YET CREATED
+│   ├── repository/                      # Global repositories - NOT YET CREATED
+│   ├── service/                         # Shared services - NOT YET CREATED (for V2)
+│   ├── client/                          # External service clients - NOT YET CREATED (for V2)
+│   └── cache/                           # Spring Cache abstractions - NOT YET CREATED (for V2)
 ├── src/main/resources/
-│   ├── application.properties           # Main configuration
+│   ├── application.properties           # JWT config, Jackson snake_case, logging
 │   └── db/migration/                    # Flyway SQL migrations (V1__, V2__, etc.)
 ├── src/test/java/com/sathira/miimoneypal/
 │   ├── MiiMoneyPalApplicationTests.java # Integration test base
 │   ├── TestMiiMoneyPalApplication.java  # Test runner with Testcontainers
 │   └── TestcontainersConfiguration.java # PostgreSQL container config
-├── compose.yaml                         # Docker Compose for local PostgreSQL
+├── compose.yaml                         # Docker Compose for local PostgreSQL (port 5433)
 └── build.gradle                         # Gradle build configuration
 ```
+
+**Note:** Packages marked "NOT YET CREATED" are planned for future implementation. Packages marked ✅ exist and are implemented.
 
 ### 5. Frontend Folder Structure
 ```
@@ -443,7 +457,7 @@ When starting a new feature, follow this order:
 - Use `@ConditionalOnProperty` for optional beans (R2/S3 repositories)
 - All response DTOs must implement the `ApiResponse` marker interface
 - Caching should use Spring Cache abstraction (`@Cacheable`) for expensive operations
-- CORS must be configured in `WebConfig.java` for frontend origin
+- CORS is configured in `SecurityConfig.java` for frontend origins (localhost:5173, localhost:3000)
 
 ## Package Naming Convention
 
@@ -464,7 +478,7 @@ spring.application.name=MiiMoneyPal
 # The @ServiceConnection annotation in TestcontainersConfiguration handles this
 
 # Add these for production/explicit configuration:
-# spring.datasource.url=jdbc:postgresql://localhost:5432/mydatabase
+# spring.datasource.url=jdbc:postgresql://localhost:5433/mydatabase
 # spring.datasource.username=myuser
 # spring.datasource.password=secret
 ```
@@ -479,14 +493,61 @@ services:
       - 'POSTGRES_PASSWORD=secret'
       - 'POSTGRES_USER=myuser'
     ports:
-      - '5432:5432'
+      - '5433:5432'  # Host:Container (5433 to avoid conflicts with local PostgreSQL)
 ```
 
-### JWT Configuration (to be added)
-```yaml
-jwt:
-  secret: your-dev-secret-key-min-256-bits
-  expiration: 86400000  # 24 hours in milliseconds
+### jOOQ Configuration (build.gradle)
+```groovy
+// Database connection properties used by jOOQ and Flyway tasks
+ext {
+    dbUrl = 'jdbc:postgresql://localhost:5433/mydatabase'
+    dbUser = 'myuser'
+    dbPassword = 'secret'
+    dbName = 'mydatabase'
+    containerName = 'miimoneypal-postgres-1'
+}
+
+// jOOQ generates code to:
+// - Directory: build/generated-src/jooq/main/
+// - Package: com.sathira.miimoneypal.jooq
+// - Excluded: flyway_schema_history table
+// - Settings: Records enabled, POJOs disabled, java.time types enabled
+```
+
+### JWT Configuration (application.properties)
+```properties
+# JWT secret - can be overridden via JWT_SECRET environment variable
+# IMPORTANT: Use a secure 256-bit (32+ characters) secret in production
+# Generate with: openssl rand -base64 32
+jwt.secret=${JWT_SECRET:your-development-secret-key-min-256-bits-required}
+
+# Token expiration times (milliseconds)
+jwt.access-token-expiration=86400000     # 24 hours
+jwt.refresh-token-expiration=604800000   # 7 days
+
+# Jackson JSON Configuration (snake_case for API consistency)
+spring.jackson.property-naming-strategy=SNAKE_CASE
+spring.jackson.serialization.write-dates-as-timestamps=false
+spring.jackson.deserialization.fail-on-unknown-properties=false
+```
+
+### Security Configuration (SecurityConfig.java)
+```
+Public Endpoints (no authentication required):
+- /api/auth/login
+- /api/auth/register
+- /api/auth/refresh
+- /actuator/** (health checks)
+
+CORS Configuration:
+- Allowed Origins: http://localhost:5173 (Vite), http://localhost:3000
+- Allowed Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS
+- Allowed Headers: Authorization, Content-Type, Accept, Origin, X-Requested-With
+- Credentials: Enabled (for JWT in Authorization header)
+- Preflight Cache: 1 hour (3600s)
+
+Session Management: STATELESS (no server-side sessions)
+Password Encoding: BCrypt
 ```
 
 ### Frontend (.env.local)

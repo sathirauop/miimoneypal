@@ -105,7 +105,7 @@ UseCase Implementation → DataAccess Interface → Repository Implementation
                              │ HTTPS
                              │
 ┌────────────────────────────┴────────────────────────────────┐
-│                  Backend (Spring Boot + Java 21)            │
+│                  Backend (Spring Boot 4.0.1 + Java 25)      │
 │  ┌──────────────────────────────────────────────────────┐   │
 │  │              Spring Security + JWT Filter            │   │
 │  └──────────────────────────────────────────────────────┘   │
@@ -349,6 +349,36 @@ AND user_id = {current_user}
 - [ ] Input validation with @Valid annotations
 - [ ] SQL injection prevented (jOOQ type-safe queries)
 - [ ] XSS prevented (React escapes by default)
+
+### CORS Configuration
+
+The `SecurityConfig.java` enables CORS for local development:
+
+| Setting | Value |
+|---------|-------|
+| **Allowed Origins** | `http://localhost:5173` (Vite), `http://localhost:3000` |
+| **Allowed Methods** | GET, POST, PUT, PATCH, DELETE, OPTIONS |
+| **Allowed Headers** | Authorization, Content-Type, Accept, Origin, X-Requested-With |
+| **Exposed Headers** | Authorization |
+| **Credentials** | Enabled (JWT in Authorization header) |
+| **Preflight Cache** | 1 hour (3600s) |
+
+**Production Considerations:**
+- Update `allowedOrigins` in `SecurityConfig.corsConfigurationSource()` with production frontend URL
+- Consider restricting allowed methods per endpoint
+- Enable HTTPS-only in production
+
+### Public Endpoints (No Authentication)
+
+| Endpoint | Purpose |
+|----------|---------|
+| `POST /api/auth/login` | User authentication |
+| `POST /api/auth/register` | New user registration |
+| `POST /api/auth/refresh` | Token refresh |
+| `GET /actuator/**` | Health checks and metrics |
+| `OPTIONS /**` | CORS preflight requests |
+
+All other endpoints require valid JWT in `Authorization: Bearer {token}` header.
 
 ---
 

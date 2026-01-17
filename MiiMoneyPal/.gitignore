@@ -35,3 +35,7 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### jOOQ Generated Sources ###
+# Regenerate with: ./gradlew generateJooq (requires PostgreSQL running)
+build/generated-src/
