@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Backend Shared Repository (2026-01-20)
+- **UserDataAccess Interface** (`repository/` package)
+  - Data access contract following the `*DataAccess` naming convention
+  - `findByEmail(String)` - Case-insensitive email lookup, returns `Optional<User>`
+  - `findById(Long)` - User lookup by ID, returns `Optional<User>`
+  - `save(User)` - Insert new user or update existing, returns saved user with generated ID
+  - `existsByEmail(String)` - Efficient email existence check
+  - `updateCurrencySymbol(Long, String)` - Update user's currency preference
+- **UserRepository** (jOOQ implementation)
+  - Implements `UserDataAccess` following the `*Repository` naming convention for implementations
+  - Type-safe SQL using jOOQ DSL (no native SQL strings)
+  - jOOQ `UsersRecord` to domain `User` record conversion via `toDomainRecord()`
+  - Robust duplicate key detection using constraint violation checks
+  - `passwordHash` validation in `insert()` to ensure required field before DB operation
+  - Exception translation: `DataAccessException` → `DuplicateResourceException`/`ResourceNotFoundException`
+
 #### Backend Domain Records (2026-01-17)
 - **Enum Types** (`records/` package)
   - `TransactionType` - INCOME, EXPENSE, INVESTMENT, WITHDRAWAL, GOAL_COMPLETED with balance effect methods

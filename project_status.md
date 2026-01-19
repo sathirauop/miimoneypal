@@ -55,6 +55,12 @@ Backend security infrastructure with JWT authentication is now complete. The pro
 - [x] **Bucket record** - Bucket domain record with target validation and status checks
 - [x] **Transaction record** - Transaction domain record with balance effect calculations
 
+### Backend Shared Repository (NEW)
+- [x] **UserDataAccess interface** - Contract for user data access (findByEmail, findById, save, existsByEmail, updateCurrencySymbol)
+- [x] **UserRepository** - jOOQ implementation with domain record conversion
+- [x] **Duplicate key detection** - Robust constraint violation handling
+- [x] **Password validation** - Validates passwordHash required for new user registration
+
 ### Test Infrastructure (Backend)
 - [x] JUnit 5 with Jupiter
 - [x] Testcontainers with PostgreSQL
@@ -185,7 +191,7 @@ Nothing currently in progress.
 
 **What STILL NEEDS TO BE CREATED:**
 - [x] ~~Domain records (records/ package - User, Transaction, Category, Bucket records)~~ ✅ COMPLETED
-- [ ] Repository layer code (repository/ package - shared repositories)
+- [x] ~~Repository layer code (repository/ package - shared repositories)~~ ✅ COMPLETED
 - [ ] UserDetailsService implementation for loading users from database
 
 ### Backend - Feature Modules
