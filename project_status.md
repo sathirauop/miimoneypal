@@ -1,11 +1,11 @@
 # Project Status
 
-**Last Updated**: 2026-01-17
-**Analyzed By**: Project Status Analyzer Agent
+**Last Updated**: 2026-01-21
+**Analyzed By**: Claude Code
 
-## Current Phase: Security Infrastructure Complete
+## Current Phase: Transaction Module Complete
 
-Backend security infrastructure with JWT authentication is now complete. The project is ready for implementing the Auth feature module (login/register endpoints).
+Backend Auth and Transaction modules are now complete. The project has full CRUD operations for transactions with comprehensive business rule validation and test coverage. Next steps: implement Categories and Buckets modules.
 
 ## Completed
 
@@ -60,6 +60,48 @@ Backend security infrastructure with JWT authentication is now complete. The pro
 - [x] **UserRepository** - jOOQ implementation with domain record conversion
 - [x] **Duplicate key detection** - Robust constraint violation handling
 - [x] **Password validation** - Validates passwordHash required for new user registration
+
+### Backend Authentication Service (NEW)
+- [x] **AppUserDetailsService** - Spring Security UserDetailsService implementation for database authentication
+- [x] **AuthenticationManager bean** - DaoAuthenticationProvider configured with UserDetailsService and BCrypt
+- [x] **User loading** - Loads users from database via UserDataAccess, converts to AppUser
+- [x] **Role assignment** - Assigns USER role with full permissions to all loaded users
+- [x] **Unit tests** - Comprehensive test coverage for AppUserDetailsService
+
+### Backend - Feature Modules
+- [x] **Auth module (rest/auth/)** - Complete authentication system with three endpoints:
+  - [x] **POST /api/auth/register** - User registration with immediate login
+  - [x] **POST /api/auth/login** - Email/password authentication
+  - [x] **POST /api/auth/refresh** - Access token refresh
+  - [x] **RegisterUseCase** - Business logic for user registration with BCrypt hashing
+  - [x] **LoginUseCase** - Business logic for authentication via AuthenticationManager
+  - [x] **RefreshUseCase** - Business logic for token refresh with validation
+  - [x] **RegisterPresenter** - Transforms User domain to RegisterResponse DTO
+  - [x] **LoginPresenter** - Transforms User domain to LoginResponse DTO
+  - [x] **RefreshPresenter** - Transforms access token to RefreshResponse DTO
+  - [x] **Unit tests** - RegisterUseCaseTest, LoginUseCaseTest, RefreshUseCaseTest
+  - [x] **Integration tests** - AuthControllerIntegrationTest with Testcontainers
+  - [x] **Email normalization** - Case-insensitive email handling (lowercase + trim)
+  - [x] **Token expiration** - Access token (24h), Refresh token (7 days)
+  - [x] **Error handling** - DuplicateResourceException (409), BadCredentialsException (401), validation errors (400)
+
+- [x] **Transaction module (rest/transactions/)** - Complete CRUD operations for financial transactions:
+  - [x] **POST /api/transactions** - Create new transaction with validation
+  - [x] **GET /api/transactions/{id}** - Fetch single transaction with details
+  - [x] **GET /api/transactions** - List with filters and pagination
+  - [x] **PUT /api/transactions/{id}** - Update transaction (type immutable)
+  - [x] **DELETE /api/transactions/{id}** - Delete transaction (hard delete)
+  - [x] **Shared repositories** - CategoryRepository, BucketRepository for validation
+  - [x] **PostTransactionUseCase** - Creates transactions with business rule enforcement
+  - [x] **GetTransactionUseCase** - Fetches single transaction (read-only)
+  - [x] **ListTransactionsUseCase** - Lists with dynamic filtering and pagination
+  - [x] **PutTransactionUseCase** - Updates with delta-based balance validation
+  - [x] **DeleteTransactionUseCase** - Deletes with system transaction protection
+  - [x] **Presenters** - Currency formatting and batch entity fetching
+  - [x] **TransactionController** - Single controller with @AuthenticationPrincipal
+  - [x] **Unit tests** - PostTransactionUseCaseTest (7 scenarios), PutTransactionUseCaseTest (4 scenarios), DeleteTransactionUseCaseTest (3 scenarios)
+  - [x] **Business rules** - System transaction protection, category/bucket mutual exclusivity, balance validation, type immutability
+  - [x] **Security** - User-scoped queries, JWT authentication required
 
 ### Test Infrastructure (Backend)
 - [x] JUnit 5 with Jupiter
@@ -192,14 +234,14 @@ Nothing currently in progress.
 **What STILL NEEDS TO BE CREATED:**
 - [x] ~~Domain records (records/ package - User, Transaction, Category, Bucket records)~~ ✅ COMPLETED
 - [x] ~~Repository layer code (repository/ package - shared repositories)~~ ✅ COMPLETED
-- [ ] UserDetailsService implementation for loading users from database
+- [x] ~~UserDetailsService implementation for loading users from database~~ ✅ COMPLETED
 
 ### Backend - Feature Modules
 
-**CRITICAL**: The `rest/` package does not exist. NO REST endpoints have been implemented.
+**STATUS**: Auth and Transaction modules complete. Remaining feature modules need implementation.
 
-- [ ] Auth module (rest/auth/ - register, login, refresh token)
-- [ ] Transactions module (rest/transactions/ - CRUD operations)
+- [x] ~~Auth module (rest/auth/ - register, login, refresh token)~~ ✅ COMPLETED
+- [x] ~~Transactions module (rest/transactions/ - CRUD operations)~~ ✅ COMPLETED
 - [ ] Categories module (rest/categories/ - CRUD + soft delete)
 - [ ] Buckets module (rest/buckets/ - CRUD + investment/withdrawal)
 - [ ] Dashboard module (rest/dashboard/ - monthly summary, usable amount)
@@ -337,14 +379,14 @@ The frontend scaffolding is **100% complete** for infrastructure setup:
 3. ~~**No Spring Security configuration**~~ - RESOLVED: Full JWT security infrastructure implemented
 
 ### HIGH Priority Issues
-1. **No REST endpoints** - The `rest/` package does not exist. Auth feature module (login/register) is the next critical step.
+1. ~~**No REST endpoints**~~ - RESOLVED: Auth module completed with register, login, refresh endpoints
 2. **No Shadcn components** - The `components/ui/` directory is empty. No UI components installed despite being required for all forms and UI.
 3. **Frontend has 0% real functionality** - All feature pages are empty placeholder components with no API integration, no forms, no data display.
 
 ### MEDIUM Priority Issues
 4. **No actual tests** - Test infrastructure exists but no test files written (no *.test.js, *.test.java files for business logic)
 5. **Categories feature empty** - The `src/features/categories/` directory exists but contains no files
-6. **No UserDetailsService** - JWT filter builds AppUser from token, but login endpoint will need to load user from database
+6. ~~**No UserDetailsService**~~ - RESOLVED: AppUserDetailsService implemented with database authentication support
 
 ## Next Steps (Critical Path)
 
@@ -366,15 +408,15 @@ The frontend scaffolding is **100% complete** for infrastructure setup:
 - SecurityConfig with stateless session management
 - CORS configured for frontend origins
 
-### Phase 4: First Feature - Auth (CURRENT PRIORITY)
+### ~~Phase 4: First Feature - Auth~~ ✅ COMPLETED
 1. ~~**Create User domain record**~~ ✅ COMPLETED - `records/user/User.java`
-2. **Build UserRepository** - jOOQ-based repository for user lookup by email
-3. **Build login endpoint** - rest/auth/login/ with full vertical slice pattern
-4. **Build register endpoint** - rest/auth/register/ with password hashing
-5. **Build refresh endpoint** - rest/auth/refresh/ for token renewal
-6. **Test auth endpoints** - Verify with curl/Postman
+2. ~~**Build UserRepository**~~ ✅ COMPLETED - jOOQ-based repository for user lookup by email
+3. ~~**Build login endpoint**~~ ✅ COMPLETED - rest/auth/login/ with full vertical slice pattern
+4. ~~**Build register endpoint**~~ ✅ COMPLETED - rest/auth/register/ with password hashing
+5. ~~**Build refresh endpoint**~~ ✅ COMPLETED - rest/auth/refresh/ for token renewal
+6. ~~**Test auth endpoints**~~ ✅ COMPLETED - Comprehensive unit and integration tests
 
-### Phase 5: Frontend Connection (HIGH)
+### Phase 5: Frontend Connection (CURRENT PRIORITY)
 7. **Install Shadcn components** - Button, Input, Card, Dialog, Label, Form
 8. **Build Login form** - Connect to backend /api/auth/login with validation
 9. **Test full auth flow** - Register → Login → JWT stored → Protected routes accessible
@@ -396,7 +438,7 @@ The frontend scaffolding is **100% complete** for infrastructure setup:
 
 - ~~**Backend core architecture**: 8-12 hours~~ ✅ COMPLETED
 - ~~**Spring Security + JWT**: 6-8 hours~~ ✅ COMPLETED
-- **Auth feature (first vertical slice)**: 4-6 hours
+- ~~**Auth feature (first vertical slice)**: 4-6 hours~~ ✅ COMPLETED
 - **Categories CRUD**: 6-8 hours
 - **Transactions CRUD**: 12-16 hours
 - **Buckets + Dashboard**: 10-14 hours
@@ -404,13 +446,13 @@ The frontend scaffolding is **100% complete** for infrastructure setup:
 - **Frontend feature integration**: 20-30 hours
 - **Testing + polish**: 15-20 hours
 
-**TOTAL ESTIMATED**: 75-110 hours remaining for MVP (down from 90-130)
+**TOTAL ESTIMATED**: 71-106 hours remaining for MVP (down from 75-110)
 
 ## Project Health Assessment
 
 - **Infrastructure**: GREEN (scaffolding complete, dependencies installed)
 - **Backend Security**: GREEN (JWT authentication, CORS, exception handling complete)
-- **Backend Features**: RED (0% - no REST endpoints yet)
+- **Backend Features**: GREEN (Auth and Transaction modules complete with tests, Categories and Buckets pending)
 - **Frontend Implementation**: YELLOW (structure exists, 0% functionality)
 - **Database**: GREEN (schema designed, migrations applied, jOOQ generated)
-- **Overall Status**: YELLOW - Security foundation complete, ready for feature development
+- **Overall Status**: GREEN - Auth and Transaction modules complete with comprehensive test coverage and business rules enforcement, ready for Categories and Buckets modules

@@ -9,6 +9,189 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Backend Auth Module (2026-01-21)
+- **Auth REST Endpoints** (`rest/auth/` package)
+  - `POST /api/auth/register` - User registration with immediate login
+    - Email validation (unique, case-insensitive)
+    - Password hashing with BCrypt (min 8, max 100 characters)
+    - Optional currency symbol (defaults to LKR)
+    - Returns user info and JWT tokens (access + refresh)
+  - `POST /api/auth/login` - Email/password authentication
+    - Authenticates via Spring Security `AuthenticationManager`
+    - Returns user info and JWT tokens
+  - `POST /api/auth/refresh` - Access token refresh
+    - Validates refresh token signature and expiration
+    - Verifies token type (rejects access tokens)
+    - Verifies user still exists in database
+    - Returns new access token (refresh token NOT rotated)
+- **Use Cases** (Business Logic)
+  - `RegisterUseCase` - Orchestrates user registration flow
+    - Email normalization (lowercase + trim)
+    - BCrypt password hashing
+    - User creation via `UserDataAccess.save()`
+    - JWT token generation
+    - Marked with `@Transactional` for atomicity
+  - `LoginUseCase` - Orchestrates login flow
+    - Delegates authentication to `AuthenticationManager`
+    - Fetches full user record for response
+    - JWT token generation
+  - `RefreshUseCase` - Orchestrates token refresh flow
+    - Multi-step validation (signature, type, user existence)
+    - New access token generation
+- **Presenters** (DTO Transformation)
+  - `RegisterPresenter` - Transforms `User` domain + tokens → `RegisterResponse`
+  - `LoginPresenter` - Transforms `User` domain + tokens → `LoginResponse`
+  - `RefreshPresenter` - Transforms access token → `RefreshResponse`
+  - All inject token expiration values from `application.properties`
+- **Response DTOs** (implementing `ApiResponse`)
+  - `RegisterResponse` - userId, email, currencySymbol, accessToken, refreshToken, expirations
+  - `LoginResponse` - userId, email, currencySymbol, accessToken, refreshToken, expirations
+  - `RefreshResponse` - accessToken, accessTokenExpiresIn
+- **Request DTOs** (with validation)
+  - `RegisterRequest` - email (@Email), password (@Size), currencySymbol (optional)
+  - `LoginRequest` - email (@Email), password (@NotBlank)
+  - `RefreshRequest` - refreshToken (@NotBlank)
+- **Controller**
+  - `AuthController` - Single controller for all auth endpoints
+  - Uses `@Valid` for request validation
+  - Returns appropriate HTTP status codes (201 CREATED for register, 200 OK for login/refresh)
+- **Test Coverage**
+  - Unit tests: `RegisterUseCaseTest`, `LoginUseCaseTest`, `RefreshUseCaseTest`
+  - Integration test: `AuthControllerIntegrationTest` with Testcontainers
+  - Full auth flow test: register → login → refresh
+  - Error scenarios: duplicate email (409), invalid credentials (401), validation errors (400)
+- **Error Handling**
+  - `DuplicateResourceException` → 409 Conflict (duplicate email)
+  - `BadCredentialsException` → 401 Unauthorized (invalid login, expired token, user not found)
+  - `BadRequestException` → 400 Bad Request (access token used as refresh)
+  - Validation errors → 400 Bad Request with field errors
+- **Token Configuration**
+  - Access token expiration: 24 hours (86400000ms)
+  - Refresh token expiration: 7 days (604800000ms)
+  - Both configurable via `jwt.access-token-expiration` and `jwt.refresh-token-expiration` in `application.properties`
+
+#### Backend Transaction Module (2026-01-21)
+- **Transaction REST Endpoints** (`rest/transactions/` package) - Full CRUD operations
+  - `POST /api/transactions` - Create new transaction
+    - Validates transaction type (rejects system-generated GOAL_COMPLETED)
+    - Enforces category/bucket mutual exclusivity based on type
+    - Validates category type matches transaction type (INCOME/EXPENSE)
+    - Prevents bucket overdraft for WITHDRAWAL transactions
+    - Blocks archived categories and buckets
+    - Returns 201 CREATED with transaction details and related entity names
+  - `GET /api/transactions/{id}` - Fetch single transaction
+    - User-scoped query (404 if not found or doesn't belong to user)
+    - Includes related category and bucket details (name, type)
+    - Returns formatted amount (currency formatting)
+    - Returns 200 OK with enriched transaction data
+  - `GET /api/transactions` - List with filters and pagination
+    - Filters: type, date range (start/end), category, bucket, note search
+    - Pagination: offset/limit (default 20, max 100)
+    - Ordered by transaction_date DESC, created_at DESC
+    - Case-insensitive note search using PostgreSQL ILIKE
+    - Returns paginated response with metadata (hasNext, hasPrevious, totalPages)
+    - Efficient batch fetching of related entities (avoids N+1 queries)
+  - `PUT /api/transactions/{id}` - Update transaction
+    - Transaction type is immutable (cannot be changed)
+    - Validates path ID matches request body ID
+    - Prevents updating system-generated transactions
+    - For WITHDRAWAL: validates balance using delta calculation
+    - Returns 200 OK with updated transaction details
+  - `DELETE /api/transactions/{id}` - Delete transaction
+    - Hard delete (permanent removal)
+    - Prevents deleting system-generated transactions
+    - Returns 200 OK with confirmation message
+- **Shared Repositories**
+  - `CategoryDataAccess` + `CategoryRepository` - Category validation and lookup
+  - `BucketDataAccess` + `BucketRepository` - Bucket validation and balance calculation
+- **Use Cases** (Business Logic) - One per endpoint following Clean Architecture
+  - `PostTransactionUseCase` - Creates transactions with validation
+    - Rejects GOAL_COMPLETED type (system-generated only)
+    - Validates category for INCOME/EXPENSE types
+    - Validates bucket for INVESTMENT/WITHDRAWAL types
+    - Checks category type matches transaction type
+    - Prevents using archived categories/buckets
+    - For WITHDRAWAL: validates bucket balance >= amount
+  - `GetTransactionUseCase` - Fetches single transaction
+    - Read-only transaction (@Transactional(readOnly = true))
+    - User-scoped query for security
+    - Gracefully handles missing related entities
+  - `ListTransactionsUseCase` - Lists with filters
+    - Read-only transaction for optimization
+    - Dynamic WHERE clause building with jOOQ
+    - Separate count query for pagination metadata
+  - `PutTransactionUseCase` - Updates transactions
+    - Prevents type changes (enforces immutability)
+    - Prevents updating GOAL_COMPLETED transactions
+    - Delta-based balance validation for WITHDRAWAL updates
+    - Preserves audit fields (createdAt, id, userId, type)
+  - `DeleteTransactionUseCase` - Deletes transactions
+    - Prevents deleting GOAL_COMPLETED transactions
+    - Hard delete with user-scoped WHERE clause
+- **Presenters** (DTO Transformation)
+  - `PostTransactionPresenter` - Formats created transaction
+  - `GetTransactionPresenter` - Formats fetched transaction with type details
+  - `ListTransactionsPresenter` - Batch fetches related entities, formats list
+  - `PutTransactionPresenter` - Formats updated transaction
+  - `DeleteTransactionPresenter` - Simple confirmation message
+  - All use `NumberFormat.getCurrencyInstance(Locale.US)` for amount formatting
+- **Response DTOs** (implementing `ApiResponse`)
+  - `PostTransactionResponse` - id, type, amount, formattedAmount, date, category/bucket details, note, createdAt
+  - `GetTransactionResponse` - Adds categoryType, bucketType, updatedAt
+  - `ListTransactionsResponse` - Paginated with items, page, size, totalItems, totalPages, hasNext, hasPrevious
+  - `TransactionSummary` - Lightweight DTO for list items
+  - `PutTransactionResponse` - Includes updatedAt timestamp
+  - `DeleteTransactionResponse` - message, deletedTransactionId
+- **Request DTOs** (with validation)
+  - `PostTransactionRequest` - type, amount (@Positive, @Digits), date (@PastOrPresent), categoryId/bucketId, note
+  - `GetTransactionRequest` - id (@Positive)
+  - `ListTransactionsRequest` - Filters + offset/limit with compact constructor defaults
+  - `PutTransactionRequest` - id, amount, date, categoryId/bucketId, note (no type field)
+  - `DeleteTransactionRequest` - id (@Positive)
+- **Controller**
+  - `TransactionController` - Single controller for all CRUD endpoints
+  - Uses `@AuthenticationPrincipal AppUser` for user injection
+  - Path variable validation for PUT (ensures ID consistency)
+  - Query parameter auto-mapping for LIST filters
+  - Returns appropriate HTTP status codes (201, 200)
+- **Business Rules Enforced**
+  - GOAL_COMPLETED transactions are system-generated only (cannot create/update/delete)
+  - Category required for INCOME/EXPENSE, bucket required for INVESTMENT/WITHDRAWAL
+  - Category/bucket mutual exclusivity (cannot have both)
+  - Category type must match transaction type
+  - Cannot use archived categories or buckets
+  - Bucket balance cannot go negative (validates before WITHDRAWAL)
+  - Transaction type is immutable after creation
+  - Delta-based balance validation for WITHDRAWAL updates
+- **Test Coverage**
+  - Unit tests: `PostTransactionUseCaseTest` (7 scenarios), `PutTransactionUseCaseTest` (4 scenarios), `DeleteTransactionUseCaseTest` (3 scenarios)
+  - Tests cover: validation rules, balance calculations, system transaction protection, error scenarios
+  - Uses Mockito for dependency mocking
+  - AssertJ for fluent assertions
+- **Security**
+  - All endpoints require JWT authentication (configured in SecurityConfig)
+  - User-scoped queries in all repositories (user_id in WHERE clause)
+  - Path variable validation prevents ID mismatch attacks
+  - Balance calculations use real-time database queries (not cached values)
+
+#### Backend Authentication Service (2026-01-20)
+- **AppUserDetailsService** (`security/` package)
+  - Implements Spring Security's `UserDetailsService` interface
+  - Loads users from database via `UserDataAccess.findByEmail()`
+  - Converts domain `User` record to `AppUser` (Spring Security's `UserDetails`)
+  - Assigns `Role.USER` by default to all authenticated users
+  - Throws `UsernameNotFoundException` for invalid credentials
+- **AuthenticationManager Bean** (SecurityConfig)
+  - `DaoAuthenticationProvider` configured with `AppUserDetailsService`
+  - Integrates with `BCryptPasswordEncoder` for password verification
+  - Used by login endpoint to authenticate user credentials
+  - Enables username/password authentication flow
+- **Unit Tests** (`AppUserDetailsServiceTest`)
+  - Tests user loading by email
+  - Tests exception handling for non-existent users
+  - Tests role assignment and authorities
+  - Tests account status flags (enabled, non-expired, non-locked)
+
 #### Backend Shared Repository (2026-01-20)
 - **UserDataAccess Interface** (`repository/` package)
   - Data access contract following the `*DataAccess` naming convention
