@@ -19,9 +19,12 @@ public record Category(
         Long userId,
         String name,
         CategoryType type,
+        String color,
+        String icon,
         Boolean isSystem,
         Boolean isArchived,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        LocalDateTime updatedAt
 ) {
     /**
      * Compact constructor for validation.

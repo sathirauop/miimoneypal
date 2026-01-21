@@ -3,9 +3,9 @@
 **Last Updated**: 2026-01-21
 **Analyzed By**: Claude Code
 
-## Current Phase: Transaction Module Complete
+## Current Phase: Categories Module Complete
 
-Backend Auth and Transaction modules are now complete. The project has full CRUD operations for transactions with comprehensive business rule validation and test coverage. Next steps: implement Categories and Buckets modules.
+Backend Auth, Transaction, and Categories modules are now complete. The project has full CRUD operations for transactions and categories with comprehensive business rule validation. Next steps: implement Buckets and Dashboard modules.
 
 ## Completed
 
@@ -103,6 +103,27 @@ Backend Auth and Transaction modules are now complete. The project has full CRUD
   - [x] **Business rules** - System transaction protection, category/bucket mutual exclusivity, balance validation, type immutability
   - [x] **Security** - User-scoped queries, JWT authentication required
 
+- [x] **Categories module (rest/categories/)** - Complete CRUD operations for income/expense categories:
+  - [x] **Database Migration V3** - Added color, icon, updated_at columns
+  - [x] **POST /api/categories** - Create new category with unique name validation
+  - [x] **GET /api/categories/{id}** - Fetch single category with details
+  - [x] **GET /api/categories** - List with type filter and includeArchived option
+  - [x] **PUT /api/categories/{id}** - Update category (type immutable, system categories protected)
+  - [x] **DELETE /api/categories/{id}** - Smart deletion (soft delete if has transactions, hard delete otherwise)
+  - [x] **Extended CategoryDataAccess** - Added methods: existsByUserIdAndNameAndType, hasTransactions, findAllByUserId, save, update, deleteById, archive
+  - [x] **Extended CategoryRepository** - Implemented all new methods with jOOQ DSL
+  - [x] **Updated Category record** - Added color, icon, updatedAt fields
+  - [x] **PostCategoryUseCase** - Creates categories with name normalization and duplicate checking
+  - [x] **GetCategoryUseCase** - Fetches single category (read-only)
+  - [x] **ListCategoriesUseCase** - Lists with type and archived filters, ordered by name
+  - [x] **PutCategoryUseCase** - Updates with duplicate name checking, protects system categories
+  - [x] **DeleteCategoryUseCase** - Smart deletion logic based on transaction existence
+  - [x] **Presenters** - Transforms domain records to response DTOs
+  - [x] **CategoryController** - Single controller with all 5 CRUD endpoints
+  - [x] **Business rules** - Unique names per user per type, system category protection, soft delete for categories with transactions, type immutability
+  - [x] **Security** - User-scoped queries, JWT authentication required
+  - [x] **Frontend integration** - API client (api.js), TanStack Query hooks (useCategoriesQuery.js), Categories.jsx page component
+
 ### Test Infrastructure (Backend)
 - [x] JUnit 5 with Jupiter
 - [x] Testcontainers with PostgreSQL
@@ -178,7 +199,7 @@ src/
 │   ├── transactions/ # Transactions page
 │   ├── buckets/      # Buckets page
 │   ├── settings/     # Settings page
-│   └── categories/   # Empty (not started)
+│   └── categories/   # Categories API, hooks, and page component (basic list view)
 ├── components/
 │   ├── Layout/       # Layout, BottomNav, ProtectedRoute
 │   └── ui/           # Empty (Shadcn components not added yet)
@@ -242,7 +263,7 @@ Nothing currently in progress.
 
 - [x] ~~Auth module (rest/auth/ - register, login, refresh token)~~ ✅ COMPLETED
 - [x] ~~Transactions module (rest/transactions/ - CRUD operations)~~ ✅ COMPLETED
-- [ ] Categories module (rest/categories/ - CRUD + soft delete)
+- [x] ~~Categories module (rest/categories/ - CRUD + soft delete)~~ ✅ COMPLETED
 - [ ] Buckets module (rest/buckets/ - CRUD + investment/withdrawal)
 - [ ] Dashboard module (rest/dashboard/ - monthly summary, usable amount)
 
@@ -369,7 +390,6 @@ The frontend scaffolding is **100% complete** for infrastructure setup:
 
 ### Missing Configuration
 - **Tailwind config file** - Using Tailwind v4's new `@theme` directive in `index.css` instead of `tailwind.config.js`. This is correct for Tailwind v4, but non-standard compared to v3.
-- **Categories feature** - The `src/features/categories/` directory exists but is completely empty.
 
 ## Known Issues
 
@@ -385,7 +405,7 @@ The frontend scaffolding is **100% complete** for infrastructure setup:
 
 ### MEDIUM Priority Issues
 4. **No actual tests** - Test infrastructure exists but no test files written (no *.test.js, *.test.java files for business logic)
-5. **Categories feature empty** - The `src/features/categories/` directory exists but contains no files
+5. ~~**Categories feature empty**~~ - RESOLVED: Categories module implemented with full CRUD operations
 6. ~~**No UserDetailsService**~~ - RESOLVED: AppUserDetailsService implemented with database authentication support
 
 ## Next Steps (Critical Path)
@@ -421,9 +441,9 @@ The frontend scaffolding is **100% complete** for infrastructure setup:
 8. **Build Login form** - Connect to backend /api/auth/login with validation
 9. **Test full auth flow** - Register → Login → JWT stored → Protected routes accessible
 
-### Phase 6: First Full Vertical Slice (MEDIUM)
-10. **Build Categories CRUD backend** - rest/categories/ with all endpoints
-11. **Build Categories CRUD frontend** - Category list, add/edit forms
+### ~~Phase 6: First Full Vertical Slice~~ ✅ COMPLETED
+10. ~~**Build Categories CRUD backend**~~ ✅ COMPLETED - rest/categories/ with all 5 endpoints
+11. **Build Categories CRUD frontend** - Category list exists, need add/edit forms with Shadcn components
 12. **Test end-to-end** - Verify full CRUD cycle
 
 ### Phase 7: Remaining Features (LOWER)
@@ -452,7 +472,7 @@ The frontend scaffolding is **100% complete** for infrastructure setup:
 
 - **Infrastructure**: GREEN (scaffolding complete, dependencies installed)
 - **Backend Security**: GREEN (JWT authentication, CORS, exception handling complete)
-- **Backend Features**: GREEN (Auth and Transaction modules complete with tests, Categories and Buckets pending)
-- **Frontend Implementation**: YELLOW (structure exists, 0% functionality)
-- **Database**: GREEN (schema designed, migrations applied, jOOQ generated)
-- **Overall Status**: GREEN - Auth and Transaction modules complete with comprehensive test coverage and business rules enforcement, ready for Categories and Buckets modules
+- **Backend Features**: GREEN (Auth, Transaction, and Categories modules complete, Buckets and Dashboard pending)
+- **Frontend Implementation**: YELLOW (structure exists, basic category integration, needs full UI components and forms)
+- **Database**: GREEN (schema designed, migrations applied including V3 for categories, jOOQ generated)
+- **Overall Status**: GREEN - Three major modules complete (Auth, Transactions, Categories) with comprehensive business rules. Ready for Buckets and Dashboard modules.

@@ -174,6 +174,126 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Path variable validation prevents ID mismatch attacks
   - Balance calculations use real-time database queries (not cached values)
 
+#### Backend Categories Module (2026-01-21)
+- **Category REST Endpoints** (`rest/categories/` package) - Full CRUD with smart deletion
+  - `POST /api/categories` - Create new category
+    - Validates unique name per user per type (INCOME/EXPENSE)
+    - Normalizes name (trim whitespace)
+    - Optional color (hex or name, max 20 chars) and icon (identifier, max 50 chars)
+    - System flag defaults to false, archived defaults to false
+    - Returns 201 CREATED with created category
+  - `GET /api/categories/{id}` - Fetch single category
+    - User-scoped query (404 if not found or doesn't belong to user)
+    - Includes all fields: color, icon, timestamps (created_at, updated_at)
+    - Returns 200 OK with category details
+  - `GET /api/categories` - List with filters
+    - Filter by type (INCOME/EXPENSE) - optional query parameter
+    - Filter by archived status - includeArchived (default: false)
+    - Ordered alphabetically by name (A-Z)
+    - Returns 200 OK with array of categories and total count
+  - `PUT /api/categories/{id}` - Update category
+    - Validates path ID matches request body ID
+    - Prevents updating system categories (403 if attempted)
+    - Type is immutable (cannot be changed after creation)
+    - If renaming, validates unique name per user per type
+    - Updates name, color, icon, updated_at timestamp
+    - Returns 200 OK with updated category
+  - `DELETE /api/categories/{id}` - Smart deletion
+    - Prevents deleting system categories (403 if attempted)
+    - If category has transactions: soft delete (set is_archived = true)
+    - If category has no transactions: hard delete (DELETE FROM categories)
+    - Returns 200 OK with deletionType ("ARCHIVED" or "DELETED")
+- **Database Migration V3** (`V3__add_category_columns.sql`)
+  - Added `color VARCHAR(20)` column - Hex color code or color name for UI display
+  - Added `icon VARCHAR(50)` column - Icon identifier for UI display
+  - Added `updated_at TIMESTAMP` column - Tracks modification timestamp
+  - Backfilled updated_at with created_at for existing rows
+  - Added column comments for documentation
+- **Extended CategoryDataAccess** (shared repository interface)
+  - `existsByUserIdAndNameAndType(userId, name, type)` - Duplicate name validation
+  - `hasTransactions(categoryId)` - Check if category has associated transactions
+  - `findAllByUserId(userId, type, includeArchived)` - List with filters
+  - `save(category)` - Insert new category with timestamps
+  - `update(category)` - Update category fields and updated_at
+  - `deleteById(id)` - Hard delete category
+  - `archive(id)` - Soft delete (set is_archived = true)
+- **Extended CategoryRepository** (jOOQ implementation)
+  - Efficient EXISTS queries instead of COUNT for boolean checks
+  - Dynamic WHERE clause building for filters
+  - Updated toDomainRecord to map new fields (color, icon, updatedAt)
+- **Updated Category Domain Record**
+  - Added `String color` field (nullable)
+  - Added `String icon` field (nullable)
+  - Added `LocalDateTime updatedAt` field (nullable)
+  - Maintains backward compatibility with existing code (builder pattern)
+- **Use Cases** (Business Logic) - One per endpoint
+  - `PostCategoryUseCase` - Creates categories
+    - Name normalization (trim whitespace)
+    - Duplicate name validation per user per type
+    - Marked with `@Transactional` for atomicity
+  - `GetCategoryUseCase` - Fetches single category
+    - Read-only transaction (@Transactional(readOnly = true))
+    - User-scoped query for security
+  - `ListCategoriesUseCase` - Lists with filters
+    - Read-only transaction for optimization
+    - Supports type filter (INCOME/EXPENSE)
+    - Supports includeArchived flag (default: false)
+    - Alphabetical ordering
+  - `PutCategoryUseCase` - Updates categories
+    - Prevents updating system categories
+    - Type immutability enforcement
+    - Duplicate name validation if renamed
+    - Preserves immutable fields (id, userId, type, isSystem, isArchived, createdAt)
+  - `DeleteCategoryUseCase` - Smart deletion
+    - Prevents deleting system categories
+    - Checks hasTransactions() to determine deletion type
+    - Soft delete if transactions exist (preserves referential integrity)
+    - Hard delete if no transactions (clean removal)
+- **Presenters** (DTO Transformation)
+  - `PostCategoryPresenter` - Formats created category
+  - `GetCategoryPresenter` - Formats fetched category with updated_at
+  - `ListCategoriesPresenter` - Formats list with CategorySummary DTOs
+  - `PutCategoryPresenter` - Formats updated category with updated_at
+  - `DeleteCategoryPresenter` - Builds appropriate message for ARCHIVED vs DELETED
+- **Response DTOs** (implementing `ApiResponse`)
+  - `PostCategoryResponse` - id, name, type, color, icon, isSystem, isArchived, createdAt
+  - `GetCategoryResponse` - Adds updatedAt timestamp
+  - `ListCategoriesResponse` - categories array (CategorySummary[]), total count
+  - `CategorySummary` - Lightweight DTO (no timestamps)
+  - `PutCategoryResponse` - id, name, type, color, icon, isSystem, isArchived, updatedAt
+  - `DeleteCategoryResponse` - message, deletedCategoryId, deletionType
+- **Request DTOs** (with validation)
+  - `PostCategoryRequest` - name (@NotBlank, @Size max 100), type (@NotNull), color (@Size max 20), icon (@Size max 50)
+  - `GetCategoryRequest` - id (@NotNull, @Positive)
+  - `ListCategoriesRequest` - type (optional), includeArchived (default: false)
+  - `PutCategoryRequest` - id (@NotNull, @Positive), name (@NotBlank, @Size max 100), color (@Size max 20), icon (@Size max 50)
+  - `DeleteCategoryRequest` - id (@NotNull, @Positive)
+- **Controller**
+  - `CategoryController` - Single controller for all 5 CRUD endpoints
+  - Uses `@AuthenticationPrincipal AppUser` for user injection
+  - Path variable validation for PUT (ensures ID consistency)
+  - Query parameter auto-mapping for LIST filters
+  - Returns appropriate HTTP status codes (201, 200)
+- **Business Rules Enforced**
+  - Category names must be unique per user per type (UNIQUE constraint)
+  - System categories cannot be updated or deleted
+  - Type is immutable after creation (cannot change INCOME ↔ EXPENSE)
+  - Smart deletion preserves data integrity (soft delete when transactions exist)
+  - Archived categories not shown by default (must explicitly include)
+  - Name normalization prevents whitespace-only differences
+- **Security**
+  - All endpoints require JWT authentication
+  - User-scoped queries in all repositories (user_id in WHERE clause)
+  - Path variable validation prevents ID mismatch attacks
+  - System category protection prevents unauthorized modifications
+- **Frontend Integration** (`mimoneypal-ui/src/features/categories/`)
+  - `api.js` - Axios-based API client with JSDoc documentation
+  - `useCategoriesQuery.js` - TanStack Query hooks (list, getById, create, update, delete)
+  - `index.js` - Feature exports
+  - `Categories.jsx` - Basic list view component with filter toggle
+  - Query cache invalidation on mutations (categories + transactions)
+  - 5-minute stale time for category queries
+
 #### Backend Authentication Service (2026-01-20)
 - **AppUserDetailsService** (`security/` package)
   - Implements Spring Security's `UserDetailsService` interface
